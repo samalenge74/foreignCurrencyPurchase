@@ -7,14 +7,14 @@
  */
 require_once 'lib/nusoap.php';
 
-class foreignCurrencyPurchase {
+class FCPurchase {
     
     private $_connection;
     private static $_instance; //The single instance
-    private $_host = ""; // Database server hostname
-    private $_username = ""; // Database user name
+    private $_host = "localhost"; // Database server hostname
+    private $_username = "root"; // Database user name
     private $_password = ""; // Database user password
-    private $_database = ""; // Database name
+    private $_database = "foreign_currency"; // Database name
     private $_email = ""; // email address to where the GBP orders will be mailed to
 
 
@@ -54,12 +54,12 @@ class foreignCurrencyPurchase {
         "X-Mailer: PHP/" . phpversion();  
         
         $subject = " Foreign Currency Purchase Order Details";
-        
-        return $this->mail($to, $subject, $message, $headers);
+                
+        return mail($to, $subject, $message, $headers);
     }
     
     function ZARWishAmount($abv, $amt){
-        $db = foreignCurrencyPurchase::getInstance();
+        $db = FCPurchase::getInstance();
         $mysqli = $db->getConnection();
         $res = $mysqli->query("select rates, surchage from fcurrency where abreviation = '{$abv}'");
         $row = $res->fetch_assoc();
@@ -72,11 +72,13 @@ class foreignCurrencyPurchase {
         $surchageAmount = $subtotal * $surchage;
         $total = $subtotal - $surchageAmount;
 
-        return $total;
+        return array('values' => array ('total' => $total,
+                                        'surchage' => $surchageAmount));
+        
     }
            
     function ZARTotalAmount($abv, $amt){
-        $db = foreignCurrencyPurchase::getInstance();
+        $db = FCPurchase::getInstance();
         $mysqli = $db->getConnection();
         $res = $mysqli->query("select rates, surchage from fcurrency where abreviation = '{$abv}'");
         $row = $res->fetch_assoc();
@@ -89,16 +91,17 @@ class foreignCurrencyPurchase {
         $surchageAmount = round(($subtotal * $surchage),2);
         $total = round(($subtotal + $surchageAmount),2);
 
-        return $total;
+        return array('values' => array ('total' => $total,
+                                        'surchage' => $surchageAmount));
     }
 
-    function SaveOrder($abv, $amt, $total){
+    function SaveOrder($abv, $amt, $total, $surcharge){
         
-        $db = foreignCurrencyPurchase::getInstance();
+        $db = FCPurchase::getInstance();
         $mysqli = $db->getConnection();
         $res = $mysqli->query("select id, name, rates, surchage from fcurrency where abreviation = '{$abv}'");
         $row = $res->fetch_assoc();
-        $fCurrencyID = $row['id']; $name = $row['name']; $rate = floatval($row['rates']); $ZARAmount = round(($amt / $rate),2); $surchageAmount = $total - $ZARAmount;  
+        $fCurrencyID = $row['id']; $name = $row['name']; $surchageAmount = $surcharge;  
                   
         $r = $mysqli->query("insert into purchase_order (amount_purchased, amount_to_be_paid, amount_surcharged, date_created, fcurrency_id) values ('$amt', '$total', '$surchageAmount', NOW(), '$fCurrencyID')");
         $n = $mysqli->affected_rows;
@@ -108,7 +111,7 @@ class foreignCurrencyPurchase {
             if ($abv == "GBP"){
                                 
                 $message = "Foreign Currency purchased: " . $name . "\n Amount Purchased = " . $amt . "\n Amount to pay in ZAR = " . $total . "\n";
-                $mail = $db->sendMail($message);
+                $db->sendMail($message);
             }
             
             if ($abv == "EUR"){
@@ -128,37 +131,52 @@ $server = new soap_server();
 $server->configureWSDL('ForeignCurrencyPurchase', 'urn:ForeignCurrencyPurchase');
 $server->soap_defencoding = 'utf-8';
 
-$server->register(
-    'foreignCurrencyPurchase.ZARTotalAmount', //Name of function
-        array('abreviation' => 'xsd:string', 'amount' => 'xsd:decimal'), //Input Values
-        array('return' => 'xsd:decimal'), //Output Values
-        'urn:ForeignCurrencyPurchasewsdl', //Namespace
-        'urn:ForeignCurrencyPurchasewsdl#ZARTotalAmount', //SoapAction
-        'rpc', //style
-        'literal', //can be encoded but it doesn't work with silverlight
-        'Returns the total amount the client has to pay in ZAR Currency'
+$server->wsdl->addComplexType('values', 'complexType', 'struct', 'all', '', 
+        array(
+                'total' =>array('name' => 'total', 'type' => 'xsd:decimal'), 
+                'surchage' => array('name' => 'surchage', 'type' => 'xsd:decimal')
+        )
+);
+
+$server->wsdl->addComplexType('valuesArray', 'complexType', 'array', '', 'SOAP-ENC:Array', array(),
+                                array(
+                                    array('ref'=>'SOAP-ENC:arrayType','wsdl:arrayType'=>'tns:values[]')
+                                ),
+                                'tns:values'
+        
 );
 
 $server->register(
-    'foreignCurrencyPurchase.ZARWishAmount', //Name of function
-        array('abreviation' => 'xsd:string', 'amount' => 'xsd:decimal'), //Input Values
-        array('return' => 'xsd:decimal'), //Output Values
-        'urn:ForeignCurrencyPurchasewsdl', //Namespace
-        'urn:ForeignCurrencyPurchasewsdl#ZARWishAmount', //SoapAction
-        'rpc', //style
-        'literal', //can be encoded but it doesn't work with silverlight
-        'Returns the amount of Foreign currency based on the amount of ZAR currency the client wishes to pay'
+    'FCPurchase.ZARTotalAmount', //Name of function
+    array('abreviation' => 'xsd:string', 'amount' => 'xsd:decimal'), //Input Values
+    array('return' => 'tns:valuesArray'), //Output Values
+    'urn:ForeignCurrencyPurchasewsdl', //Namespace
+    'urn:ForeignCurrencyPurchasewsdl#ZARTotalAmount', //SoapAction
+    'rpc', //style
+    'literal', //can be encoded but it doesn't work with silverlight
+    'Returns the total amount the client has to pay in ZAR Currency'
 );
 
 $server->register(
-    'foreignCurrencyPurchase.SaveOrder', //Name of function
-        array('abreviation' => 'xsd:string', 'amount' => 'xsd:decimal', 'total' => 'xsd:decimal'), //Input Values
-        array('return' => 'xsd:boolean'), //Output Values
-        'urn:ForeignCurrencyPurchasewsdl', //Namespace
-        'urn:ForeignCurrencyPurchasewsdl#SaveOrder', //SoapAction
-        'rpc', //style
-        'literal', //can be encoded but it doesn't work with silverlight
-        'The client order get saved in the database'
+    'FCPurchase.ZARWishAmount', //Name of function
+    array('abreviation' => 'xsd:string', 'amount' => 'xsd:decimal'), //Input Values
+    array('return' => 'tns:valuesArray'), //Output Values
+    'urn:ForeignCurrencyPurchasewsdl', //Namespace
+    'urn:ForeignCurrencyPurchasewsdl#ZARWishAmount', //SoapAction
+    'rpc', //style
+    'literal', //can be encoded but it doesn't work with silverlight
+    'Returns the amount of Foreign currency based on the amount of ZAR currency the client wishes to pay'
+);
+
+$server->register(
+    'FCPurchase.SaveOrder', //Name of function
+    array('abreviation' => 'xsd:string', 'amount' => 'xsd:decimal', 'total' => 'xsd:decimal', 'surcharge' => 'xsd:decimal'), //Input Values
+    array('return' => 'xsd:boolean'), //Output Values
+    'urn:ForeignCurrencyPurchasewsdl', //Namespace
+    'urn:ForeignCurrencyPurchasewsdl#SaveOrder', //SoapAction
+    'rpc', //style
+    'literal', //can be encoded but it doesn't work with silverlight
+    'The client order get saved in the database'
 );
 
 $HTTP_RAW_POST_DATA = isset($HTTP_RAW_POST_DATA) ? $HTTP_RAW_POST_DATA : '';

@@ -20,7 +20,7 @@ if ($error) {
     echo "<h2>Constructor error</h2><pre>" . $error . "</pre>";
 }
 
-$result = $client->call("foreignCurrencyPurchase.ZARTotalAmount", array('abreviation' => $abv, 'amount' => $amt));
+$result = $client->call("FCPurchase.ZARTotalAmount", array('abreviation' => $abv, 'amount' => $amt));
 
 if ($client->fault) {
     echo "<h2>Fault</h2><pre>";
@@ -31,7 +31,8 @@ if ($client->fault) {
     if ($error) {
         echo "<h2>Error</h2><pre>" . $error . "</pre>";
     } else {
-        echo $result;
+        $values  = $result['item'];
+        echo($values['total'] . '|' . $values['surchage']);
     }
 }
 

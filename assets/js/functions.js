@@ -24,7 +24,9 @@ $(document).ready(function () {
             url: 'assets/nusoap/totalAmountinZAR.php',
             data: dataString,
             success: function(msg){
-                $('form#purchase_currency input#total').val(msg);
+                var values = msg.split('|');
+                $('form#purchase_currency input#total').val(values[0]);
+                $('form#purchase_currency input#surcharge').val(values[1]);
             },
             error: function(ob,errStr) {
                 alert('There was an error in your request.');
@@ -57,8 +59,10 @@ $(document).ready(function () {
             url: 'assets/nusoap/amountFCurrency.php',
             data: dataString,
             success: function(msg){
-                $('form#purchase_currency input#fc').val(msg);
+                var values = msg.split('|');
+                $('form#purchase_currency input#fc').val(values[0]);
                 $('form#purchase_currency input#total').val(amt);
+                $('form#purchase_currency input#surcharge').val(values[1]);
             },
             error: function(ob,errStr) {
                 alert('There was an error in your request.');
@@ -91,13 +95,14 @@ $(document).ready(function () {
         var amt = $('form#purchase_currency input#fc').val();
         var abv = $("input:radio[name=currency]:checked").val();
         var total = $('form#purchase_currency input#total').val();
+        var surcharge = $('form#purchase_currency input#surcharge').val();
         
         $.ajaxSetup ({
             cache: false
         });
         
                 
-        var dataString = {abv: abv, amt: amt, total: total};
+        var dataString = {abv: abv, amt: amt, total: total, surcharge: surcharge};
         $.ajax({
             type: 'post',
             url: 'assets/nusoap/saveOrder.php',
@@ -107,7 +112,7 @@ $(document).ready(function () {
                     alert('Your order have been captured successfully');
                     $('form#purchase_currency').trigger('reset');
                 }else{
-                    alert('There was a problem capturing your. Please contact the service provider.')
+                    alert('There was a problem capturing your order. Please contact the service provider.')
                 }
             },
             error: function(ob,errStr) {

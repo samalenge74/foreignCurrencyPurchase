@@ -10,7 +10,8 @@ require_once 'lib/nusoap.php';
 
 $amt = floatval(filter_input(INPUT_POST, "amt"));
 $abv = filter_input(INPUT_POST, "abv");
-$total = filter_input(INPUT_POST, "total");
+$total = floatval(filter_input(INPUT_POST, "total"));
+$surcharge = floatval(filter_input(INPUT_POST, "surcharge"));
 
 $wsdl = "http://localhost/foreignCurrencyPurchase/assets/nusoap/soap-server.php?wsdl";
 
@@ -21,7 +22,7 @@ if ($error) {
     echo "<h2>Constructor error</h2><pre>" . $error . "</pre>";
 }
 
-$result = $client->call("foreignCurrencyPurchase.SaveOrder", array('abreviation' => $abv, 'amount' => $amt, 'total' => $total));
+$result = $client->call("FCPurchase.SaveOrder", array('abreviation' => $abv, 'amount' => $amt, 'total' => $total, 'surcharge' => $surcharge));
 
 if ($client->fault) {
     echo "<h2>Fault</h2><pre>";
@@ -35,6 +36,7 @@ if ($client->fault) {
         echo $result;
     }
 }
+
 
 
 
