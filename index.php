@@ -78,7 +78,7 @@
                             <div class="input-group">
                                 <span class="input-group-addon" >Total in ZAR</span>
                                 <input type="text" id="total" class="form-control" placeholder="amount to be paid" aria-describedby="basic-addon1">
-                                
+                                <input type="hidden" id="surcharge" class="form-control" placeholder="amount to be paid" aria-describedby="basic-addon1" value="">
                             </div>
                             
                         </div>
